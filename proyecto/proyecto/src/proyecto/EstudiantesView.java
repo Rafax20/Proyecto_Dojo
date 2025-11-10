@@ -1,60 +1,232 @@
-// Asegúrate de que esto coincida con tu paquete
 package proyecto;
 
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import javax.swing.JOptionPane;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.plaf.basic.BasicInternalFrameUI;
+import javax.swing.DefaultListModel;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.RowFilter;
+import javax.swing.table.TableRowSorter;
+import proyecto.SeleccionarRepresentanteView;
+import proyecto.AgregarExamenView;
+import proyecto.AgregarCertificadoView; 
 
 public class EstudiantesView extends javax.swing.JInternalFrame {
 
-    /**
-     * Creates new form EstudiantesView
-     */
+
+    private boolean modoEdicion = false; 
+    private String cedulaRepresentanteSeleccionado = null;
+    
+
+    private DefaultListModel<String> modeloListaExamenes;
+    private DefaultListModel<String> modeloListaCertificados; 
+    private TableRowSorter<DefaultTableModel> sorter;
+    
+   
+
     public EstudiantesView() {
         initComponents();
         
-        // --- NUESTRAS MODIFICACIONES ---
+  
+        modeloListaExamenes = new DefaultListModel<>();
+        listaExamenes.setModel(modeloListaExamenes);
+        modeloListaCertificados = new DefaultListModel<>();
+        listaCertificados.setModel(modeloListaCertificados);
         
-        // 1. Esto es para que la ventana interna no tenga la barra de título superior
-        // Se ve más limpio dentro de un JDesktopPane
+
+        cargarTablaEstudiantes();
+        
+    
+        DefaultTableModel modelo = (DefaultTableModel) tablaEstudiantes.getModel();
+        sorter = new TableRowSorter<>(modelo);
+        tablaEstudiantes.setRowSorter(sorter);
+
+        
+        
+
+        tablaEstudiantes.getSelectionModel().addListSelectionListener((ListSelectionEvent e) -> {
+
+        });
+        
+        
+
+        txtBuscar.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+           
+                filtrarTablaEstudiantes();
+            }
+        });
+
         this.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
         BasicInternalFrameUI ui = (BasicInternalFrameUI) this.getUI();
         ui.setNorthPane(null);
         
-        // 2. Habilitamos los botones por defecto
+   
         habilitarCampos(false);
         btnGuardar.setEnabled(false);
         btnCancelar.setEnabled(false);
         btnNuevo.setEnabled(true);
         
-        // --- FIN DE MODIFICACIONES ---
+
+        modeloListaExamenes = new DefaultListModel<>();
+        listaExamenes.setModel(modeloListaExamenes);
+        
+        modeloListaCertificados = new DefaultListModel<>(); 
+        listaCertificados.setModel(modeloListaCertificados); 
+        
+    
+        cargarTablaEstudiantes();
+        
+       
+        tablaEstudiantes.getSelectionModel().addListSelectionListener((ListSelectionEvent e) -> {
+            if (!e.getValueIsAdjusting() && tablaEstudiantes.getSelectedRow() != -1) {
+                String cedula = tablaEstudiantes.getValueAt(tablaEstudiantes.getSelectedRow(), 0).toString();
+                
+    
+                cargarExamenes(cedula);
+                cargarCertificados(cedula); 
+            }
+        });
     }
     
-    /**
-     * Habilita o deshabilita los campos del formulario.
-     * @param enabled true para habilitar, false para deshabilitar
-     */
+
+    
+    private void filtrarTablaEstudiantes() {
+        String texto = txtBuscar.getText().trim();
+        
+        if (texto.isEmpty()) {
+  
+            sorter.setRowFilter(null);
+        } else {
+          
+
+            sorter.setRowFilter(RowFilter.regexFilter("(?i)" + texto));
+        }
+    }
+    
     private void habilitarCampos(boolean enabled) {
         txtCedula.setEnabled(enabled);
         txtNombre.setEnabled(enabled);
         cmbNivel.setEnabled(enabled);
         btnBuscarRepresentante.setEnabled(enabled);
-        // ... (habilita otros campos si los añades)
     }
     
-    /**
-     * Limpia los campos del formulario.
-     */
+   
     private void limpiarCampos() {
         txtCedula.setText("");
         txtNombre.setText("");
         cmbNivel.setSelectedIndex(0);
         txtRepresentanteNombre.setText(""); 
+        this.cedulaRepresentanteSeleccionado = null; 
+        
+        modeloListaExamenes.clear();
+        modeloListaCertificados.clear(); 
+    }
+    
+    private void cargarTablaEstudiantes() {
+        DefaultTableModel modeloTabla = (DefaultTableModel) tablaEstudiantes.getModel();
+        modeloTabla.setRowCount(0); 
+
+        Connection conn = Conexion.getConexion();
+        String sql = "SELECT e.cedula, e.nombre, e.nivel, r.nombre as nombre_representante " +
+                     "FROM estudiantes e " +
+                     "LEFT JOIN representantes r ON e.id_representante_fk = r.cedula";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            
+            modeloTabla.setColumnIdentifiers(new Object[]{"Cédula", "Nombre", "Nivel", "Representante"});
+            
+            while (rs.next()) {
+                Object[] fila = new Object[4];
+                fila[0] = rs.getString("cedula");
+                fila[1] = rs.getString("nombre");
+                fila[2] = rs.getString("nivel");
+                fila[3] = rs.getString("nombre_representante");
+                modeloTabla.addRow(fila);
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar estudiantes: " + e.getMessage());
+        }
+    }
+    
+    private boolean estudianteYaExiste(String cedula) {
+        Connection conn = Conexion.getConexion();
+        String sql = "SELECT COUNT(*) FROM estudiantes WHERE cedula = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, cedula);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error al verificar cédula: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    private void cargarExamenes(String cedulaEstudiante) {
+        modeloListaExamenes.clear();
+        Connection conn = Conexion.getConexion();
+        String sql = "SELECT fecha, nivel_evaluado, resultado FROM examenes " +
+                     "WHERE id_estudiante_fk = ? ORDER BY fecha DESC";
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, cedulaEstudiante);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    String linea = String.format("Fecha: %s | Nivel: %s | Resultado: %s", 
+                                     rs.getString("fecha"), 
+                                     rs.getString("nivel_evaluado"), 
+                                     rs.getString("resultado"));
+                    modeloListaExamenes.addElement(linea);
+                }
+            }
+            if (modeloListaExamenes.isEmpty()) {
+                modeloListaExamenes.addElement("Sin exámenes registrados.");
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar exámenes: " + e.getMessage());
+        }
+    }
+    
+    
+ 
+    private void cargarCertificados(String cedulaEstudiante) {
+        modeloListaCertificados.clear();
+        Connection conn = Conexion.getConexion();
+        String sql = "SELECT fecha_emision, nivel_certificado, codigo_unico FROM certificados " +
+                     "WHERE id_estudiante_fk = ? ORDER BY fecha_emision DESC";
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, cedulaEstudiante);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    String codigo = (rs.getString("codigo_unico") != null) ? rs.getString("codigo_unico") : "N/A";
+                    String linea = String.format("Fecha: %s | Nivel: %s | Código: %s", 
+                                     rs.getString("fecha_emision"), 
+                                     rs.getString("nivel_certificado"), 
+                                     codigo);
+                    modeloListaCertificados.addElement(linea);
+                }
+            }
+            if (modeloListaCertificados.isEmpty()) {
+                modeloListaCertificados.addElement("Sin certificados registrados.");
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error al cargar certificados: " + e.getMessage());
+        }
     }
 
-    /**
-     * This method is called from within the constructor to initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is always
-     * regenerated by the Form Editor.
-     */
+
+  
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">                          
     private void initComponents() {
@@ -111,15 +283,20 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
         tablaEstudiantes.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         tablaEstudiantes.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {"12345678", "Juan Perez", "Kyu 10"},
-                {"87654321", "Maria Lopez", "Kyu 9"},
-                {null, null, null},
-                {null, null, null}
+
             },
             new String [] {
-                "Cédula", "Nombre", "Nivel"
+                "Cédula", "Nombre", "Nivel", "Representante"
             }
-        ));
+        ) {
+            boolean[] canEdit = new boolean [] {
+                false, false, false, false
+            };
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
+            }
+        });
         jScrollPane1.setViewportView(tablaEstudiantes);
 
         btnModificar.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
@@ -133,6 +310,11 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
         btnEliminar.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         btnEliminar.setForeground(new java.awt.Color(204, 0, 0));
         btnEliminar.setText("Eliminar Seleccionado");
+        btnEliminar.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnEliminarActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout panelConsultaLayout = new javax.swing.GroupLayout(panelConsulta);
         panelConsulta.setLayout(panelConsultaLayout);
@@ -222,6 +404,11 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
         txtRepresentanteNombre.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
 
         btnBuscarRepresentante.setText("Relacionar...");
+        btnBuscarRepresentante.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnBuscarRepresentanteActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout panelDatosLayout = new javax.swing.GroupLayout(panelDatos);
         panelDatos.setLayout(panelDatosLayout);
@@ -270,14 +457,15 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
 
         tabbedPaneEstudiante.addTab("Datos Personales", panelDatos);
 
-        listaExamenes.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Examen Kyu 10 - Aprobado (2025-01-15)", "Examen Kyu 9 - Aprobado (2025-06-20)" };
-            public int getSize() { return strings.length; }
-            public String getElementAt(int i) { return strings[i]; }
-        });
         jScrollPane2.setViewportView(listaExamenes);
 
         btnAgregarExamen.setText("Añadir Examen...");
+        // --- ¡¡¡CONECTANDO EL BOTÓN!!! ---
+        btnAgregarExamen.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnAgregarExamenActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout panelExamenesLayout = new javax.swing.GroupLayout(panelExamenes);
         panelExamenes.setLayout(panelExamenesLayout);
@@ -304,14 +492,15 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
 
         tabbedPaneEstudiante.addTab("Exámenes", panelExamenes);
 
-        listaCertificados.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "Certificado Kyu 10 (2025-01-20)", "Certificado Kyu 9 (2025-06-25)" };
-            public int getSize() { return strings.length; }
-            public String getElementAt(int i) { return strings[i]; }
-        });
         jScrollPane3.setViewportView(listaCertificados);
 
         btnAgregarCertificado.setText("Añadir Certificado...");
+        // --- ¡¡¡CONECTANDO EL BOTÓN!!! ---
+        btnAgregarCertificado.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnAgregarCertificadoActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout panelCertificadosLayout = new javax.swing.GroupLayout(panelCertificados);
         panelCertificados.setLayout(panelCertificadosLayout);
@@ -415,90 +604,206 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
     }// </editor-fold>                        
 
     private void btnCerrarActionPerformed(java.awt.event.ActionEvent evt) {                                          
-        // Cierra esta ventana interna
         this.dispose();
     }                                         
 
     private void btnNuevoActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        // Lógica para "Afiliar"
         limpiarCampos();
         habilitarCampos(true);
-        
         btnNuevo.setEnabled(false);
         btnGuardar.setEnabled(true);
         btnCancelar.setEnabled(true);
         btnModificar.setEnabled(false);
         btnEliminar.setEnabled(false);
-        
         txtCedula.requestFocus();
+        this.modoEdicion = false; 
     }                                        
 
     private void btnCancelarActionPerformed(java.awt.event.ActionEvent evt) {                                            
-        // Cancela la acción
         limpiarCampos();
         habilitarCampos(false);
-        
         btnNuevo.setEnabled(true);
         btnGuardar.setEnabled(false);
         btnCancelar.setEnabled(false);
         btnModificar.setEnabled(true);
         btnEliminar.setEnabled(true);
+        this.modoEdicion = false;
+        tablaEstudiantes.clearSelection();
     }                                           
 
     private void btnGuardarActionPerformed(java.awt.event.ActionEvent evt) {                                           
-        // Lógica para "Modificar" o Guardar Nuevo
-        
-        // 1. Aquí deberías validar los campos (txtCedula, txtNombre, etc.)
-        
-        // 2. Aquí guardarías en la base de datos
-        
-        // 3. Simulación de guardado exitoso:
-        javax.swing.JOptionPane.showMessageDialog(this, "Estudiante guardado con éxito.");
-        
-        // 4. Volver al estado inicial
-        limpiarCampos();
-        habilitarCampos(false);
-        btnNuevo.setEnabled(true);
-        btnGuardar.setEnabled(false);
-        btnCancelar.setEnabled(false);
-        btnModificar.setEnabled(true);
-        btnEliminar.setEnabled(true);
-        
-        // 5. Aquí deberías recargar la tabla (panelConsulta)
-    }                                          
+        String cedula = txtCedula.getText().trim();
+        String nombre = txtNombre.getText().trim();
+        String nivel = cmbNivel.getSelectedItem().toString();
 
-    private void btnModificarActionPerformed(java.awt.event.ActionEvent evt) {                                             
-        // Lógica para cargar datos de la tabla al formulario
-        
-        // 1. Obtener la fila seleccionada
-        int fila = tablaEstudiantes.getSelectedRow();
-        if (fila < 0) {
-            javax.swing.JOptionPane.showMessageDialog(this, "Debe seleccionar un estudiante de la tabla.", "Error", javax.swing.JOptionPane.WARNING_MESSAGE);
+        if (cedula.isEmpty() || nombre.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "La Cédula y el Nombre son obligatorios.");
             return;
         }
         
-        // 2. Cargar los datos (simulados de la tabla)
+        Connection conn = Conexion.getConexion();
+        
+        if (this.modoEdicion) {
+            String sql = "UPDATE estudiantes SET nombre = ?, nivel = ?, id_representante_fk = ? WHERE cedula = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, nombre);
+                pstmt.setString(2, nivel);
+                pstmt.setString(3, this.cedulaRepresentanteSeleccionado);
+                pstmt.setString(4, cedula); 
+                pstmt.executeUpdate();
+                JOptionPane.showMessageDialog(this, "¡Estudiante modificado con éxito!");
+                cargarTablaEstudiantes();
+                btnCancelarActionPerformed(null); 
+            } catch (SQLException e) {
+                 JOptionPane.showMessageDialog(this, "Error al modificar: " + e.getMessage());
+            }
+        } else {
+            if (estudianteYaExiste(cedula)) {
+                JOptionPane.showMessageDialog(this, "La Cédula '" + cedula + "' ya está registrada.");
+                return;
+            }
+            String sql = "INSERT INTO estudiantes (cedula, nombre, nivel, id_representante_fk) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, cedula);
+                pstmt.setString(2, nombre);
+                pstmt.setString(3, nivel);
+                pstmt.setString(4, this.cedulaRepresentanteSeleccionado); 
+                pstmt.executeUpdate();
+                JOptionPane.showMessageDialog(this, "¡Estudiante afiliado con éxito!");
+                cargarTablaEstudiantes();
+                btnCancelarActionPerformed(null); 
+            } catch (SQLException e) {
+                 JOptionPane.showMessageDialog(this, "Error al guardar: " + e.getMessage());
+            }
+        }
+    }                                          
+
+    private void btnModificarActionPerformed(java.awt.event.ActionEvent evt) {                                             
+        int fila = tablaEstudiantes.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(this, "Debe seleccionar un estudiante.");
+            return;
+        }
+        
         String cedula = tablaEstudiantes.getValueAt(fila, 0).toString();
         String nombre = tablaEstudiantes.getValueAt(fila, 1).toString();
         String nivel = tablaEstudiantes.getValueAt(fila, 2).toString();
+        String nombreRep = (tablaEstudiantes.getValueAt(fila, 3) != null) ? tablaEstudiantes.getValueAt(fila, 3).toString() : "";
         
         txtCedula.setText(cedula);
         txtNombre.setText(nombre);
         cmbNivel.setSelectedItem(nivel);
-        // (Aquí cargarías el representante, exámenes, etc.)
+        txtRepresentanteNombre.setText(nombreRep); 
         
-        // 3. Habilitar formulario para edición
+        this.cedulaRepresentanteSeleccionado = null; 
+        if (!nombreRep.isEmpty()) {
+            Connection conn = Conexion.getConexion();
+            String sql = "SELECT id_representante_fk FROM estudiantes WHERE cedula = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, cedula);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        this.cedulaRepresentanteSeleccionado = rs.getString("id_representante_fk");
+                    }
+                }
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(this, "Error al cargar ID del representante: " + e.getMessage());
+            }
+        }
+        
         habilitarCampos(true);
         btnNuevo.setEnabled(false);
         btnGuardar.setEnabled(true);
         btnCancelar.setEnabled(true);
-        
-        // No dejamos editar la cédula (PK)
         txtCedula.setEnabled(false); 
+        this.modoEdicion = true; 
+        
+     
+        cargarExamenes(cedula);
+        cargarCertificados(cedula); 
     }                                            
 
+    private void btnEliminarActionPerformed(java.awt.event.ActionEvent evt) {                                            
+        int filaSeleccionada = tablaEstudiantes.getSelectedRow();
+        if (filaSeleccionada < 0) {
+            JOptionPane.showMessageDialog(this, "Debe seleccionar un estudiante.");
+            return;
+        }
+        
+        String cedula = tablaEstudiantes.getValueAt(filaSeleccionada, 0).toString();
+        String nombre = tablaEstudiantes.getValueAt(filaSeleccionada, 1).toString();
+        
+        int confirmacion = JOptionPane.showConfirmDialog(this, 
+                "¿Está seguro de que desea eliminar a:\n" + nombre + " (C.I: " + cedula + ")?",
+                "Confirmar Eliminación", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        
+        if (confirmacion == JOptionPane.YES_OPTION) {
+            Connection conn = Conexion.getConexion();
+           
+            String sql = "DELETE FROM estudiantes WHERE cedula = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, cedula);
+                pstmt.executeUpdate();
+                JOptionPane.showMessageDialog(this, "Estudiante eliminado con éxito.");
+                cargarTablaEstudiantes(); 
+                limpiarCampos();
+                btnCancelarActionPerformed(null); 
+            } catch (SQLException e) {
+                 JOptionPane.showMessageDialog(this, "Error al eliminar: " + e.getMessage() + "\nPrimero debe eliminar los exámenes y certificados asociados.");
+            }
+        }
+    }                                           
 
-    // Variables declaration - do not modify                     
+    private void btnBuscarRepresentanteActionPerformed(java.awt.event.ActionEvent evt) {                                                       
+        SeleccionarRepresentanteView selector = new SeleccionarRepresentanteView(this, true);
+        selector.setVisible(true);
+        
+        String cedula = selector.getCedulaSeleccionada();
+        String nombre = selector.getNombreSeleccionado();
+        
+        if (cedula != null && nombre != null) {
+            this.cedulaRepresentanteSeleccionado = cedula; 
+            this.txtRepresentanteNombre.setText(nombre); 
+        }
+    }                                                      
+    
+    private void btnAgregarExamenActionPerformed(java.awt.event.ActionEvent evt) {
+        int fila = tablaEstudiantes.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(this, "Primero debe seleccionar un estudiante.");
+            return;
+        }
+        String cedulaEstudiante = tablaEstudiantes.getValueAt(fila, 0).toString();
+        AgregarExamenView dialog = new AgregarExamenView(this, true, cedulaEstudiante);
+        dialog.setVisible(true);
+        if (dialog.isGuardadoExitoso()) {
+            cargarExamenes(cedulaEstudiante);
+        }
+    }
+    
+    
+
+    private void btnAgregarCertificadoActionPerformed(java.awt.event.ActionEvent evt) {
+        int fila = tablaEstudiantes.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(this, "Primero debe seleccionar un estudiante.");
+            return;
+        }
+        String cedulaEstudiante = tablaEstudiantes.getValueAt(fila, 0).toString();
+        
+
+        AgregarCertificadoView dialog = new AgregarCertificadoView(this, true, cedulaEstudiante);
+        
+    
+        dialog.setVisible(true);
+        
+  
+        if (dialog.isGuardadoExitoso()) {
+            cargarCertificados(cedulaEstudiante);
+        }
+    }
+    
+                   
     private javax.swing.JButton btnAgregarCertificado;
     private javax.swing.JButton btnAgregarExamen;
     private javax.swing.JButton btnBuscarRepresentante;
@@ -531,13 +836,16 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
     private javax.swing.JTextField txtCedula;
     private javax.swing.JTextField txtNombre;
     private javax.swing.JTextField txtRepresentanteNombre;
-    // End of variables declaration                   
+             
 }
+    @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
-        this.setLayout(layout);
+        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
+        getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGap(0, 400, Short.MAX_VALUE)
@@ -546,6 +854,8 @@ public class EstudiantesView extends javax.swing.JInternalFrame {
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGap(0, 300, Short.MAX_VALUE)
         );
+
+        pack();
     }// </editor-fold>//GEN-END:initComponents
 
 

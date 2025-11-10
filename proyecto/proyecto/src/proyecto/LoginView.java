@@ -1,7 +1,5 @@
 package proyecto;
 
- 
-
 import java.awt.Color;
 import java.awt.Image;
 import javax.swing.ImageIcon;
@@ -9,112 +7,77 @@ import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-// Importamos java.net.URL para poder usar getResource()
 import java.net.URL; 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+
+import proyecto.MainView; 
 
 public class LoginView extends javax.swing.JFrame {
 
-    // Variable para el logo
+
     private javax.swing.JLabel lblLogo;
 
-    /**
-     * Creates new form LoginView
-     */
-        
-        public LoginView() {
+
+    public LoginView() {
         initComponents();
         
-        // --- ARREGLO IMPORTANTE ---
-        // Esta línea mueve nuestro panel de login a la capa superior ("Modal")
-        // para que se dibuje ENCIMA del fondo (que está en "Default Layer").
+    
         getLayeredPane().add(panelLogin, JLayeredPane.MODAL_LAYER);
-        // --- FIN DEL ARREGLO ---
         
-        
-        // --- NUESTRAS MODIFICACIONES ---
-        
-        // 1. Establecer el tamaño de la ventana
+    
         setSize(800, 800);
-        
-        // 2. Centrar la ventana en la pantalla
-        setLocationRelativeTo(null);
-        
-        // 3. Llamar a nuestro método para configurar el fondo
+        setLocationRelativeTo(null); 
         configurarFondo();
-        
-        // 4. Llamar al método para configurar el logo
         configurarLogo();
-        
-        // 5. Hacer que nuestro panel de login sea semitransparente
-        // (El '220' es el nivel de alfa/transparencia. 255=sólido, 0=invisible)
-        panelLogin.setBackground(new Color(255, 255, 255, 220));
-        
-        // --- FIN DE MODIFICACIONES ---
+        panelLogin.setBackground(new Color(255, 255, 255, 220)); 
     }
     
-    /**
-     * Método para configurar la imagen de fondo (Cargando desde SRC).
-     */
+    
+   
     private void configurarFondo() {
-        // --- ¡¡¡IMPORTANTE 1!!! ---
-        // Asegúrate de que esta ruta sea correcta.
+       
         String rutaImagen = "/assets/fondo.jpg"; 
-        // -------------------------
 
         try {
-            // Obtenemos la URL del recurso que está DENTRO del JAR
             URL urlFondo = getClass().getResource(rutaImagen);
-
             if (urlFondo == null) {
-                // Esto pasa si la ruta está mal escrita
                 throw new Exception("Recurso de fondo no encontrado: " + rutaImagen);
             }
-            
             ImageIcon icono = new ImageIcon(urlFondo);
-
-            // Escalar la imagen
             Image img = icono.getImage().getScaledInstance(this.getWidth(), this.getHeight(), Image.SCALE_SMOOTH);
             ImageIcon iconoEscalado = new ImageIcon(img);
             JLabel fondoLabel = new JLabel(iconoEscalado);
             fondoLabel.setBounds(0, 0, this.getWidth(), this.getHeight());
-
-            // Añadir el JLabel al JLayeredPane (detrás de todo)
-            getLayeredPane().add(fondoLabel, JLayeredPane.DEFAULT_LAYER);
-
-            // Hacer que el panel de contenido sea transparente
-            ((JPanel)getContentPane()).setOpaque(false);
             
+       
+            getLayeredPane().add(fondoLabel, JLayeredPane.DEFAULT_LAYER);
+            
+            ((JPanel)getContentPane()).setOpaque(false);
         } catch (Exception e) {
             System.err.println("Error al cargar la imagen de fondo: " + e.getMessage());
              getContentPane().setBackground(Color.DARK_GRAY);
         }
     }
 
-    /**
-     * Método para configurar el logo (Cargando desde SRC).
-     */
+
     private void configurarLogo() {
-        // --- ¡¡¡IMPORTANTE 2!!! ---
-        // Asegúrate de que esta ruta sea correcta.
+   
         String rutaLogo = "/assets/dojo.png";
         int logoAncho = 128; 
         int logoAlto = 128; 
-        // -------------------------
 
         try {
-            // Obtenemos la URL del recurso
             URL urlLogo = getClass().getResource(rutaLogo);
-            
             if (urlLogo == null) {
                 throw new Exception("Recurso de logo no encontrado: " + rutaLogo);
             }
-            
             ImageIcon iconoLogo = new ImageIcon(urlLogo);
-            
             Image img = iconoLogo.getImage().getScaledInstance(logoAncho, logoAlto, Image.SCALE_SMOOTH);
-            // Asignamos la imagen al JLabel 'lblLogo'
             lblLogo.setIcon(new ImageIcon(img));
-            
         } catch (Exception e) {
             System.err.println("Error al cargar el logo: " + e.getMessage());
             lblLogo.setText("[ LOGO NO ENCONTRADO ]"); 
@@ -122,11 +85,6 @@ public class LoginView extends javax.swing.JFrame {
     }
 
 
-    /**
-     * This method is called from within the constructor to initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is always
-     * regenerated by the Form Editor.
-     */
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">                          
     private void initComponents() {
@@ -141,6 +99,7 @@ public class LoginView extends javax.swing.JFrame {
         btnIniciarSesion = new javax.swing.JButton();
         btnRegistrar = new javax.swing.JButton();
 
+        // ESTE ES EL IMPORTANTE. Si cierras el login, se cierra todo.
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Sistema de Dojo - Login");
         setResizable(false);
@@ -246,64 +205,87 @@ public class LoginView extends javax.swing.JFrame {
         pack();
     }// </editor-fold>                        
 
-    private void btnIniciarSesionActionPerformed(java.awt.event.ActionEvent evt) {                                                 
-        // LÓGICA DE INICIO DE SESIÓN
+    
+
+   private void btnIniciarSesionActionPerformed(java.awt.event.ActionEvent evt) {                                                 
         String usuario = txtUsuario.getText();
         String pass = new String(txtPassword.getPassword());
 
-        // SIMULACIÓN DE ÉXITO:
-        if (usuario.equals("admin") && pass.equals("123")) {
-            
-            // Abrir la ventana principal
-            // (Asegúrate de tener un MainView.java)
-      //      MainView menuPrincipal = new MainView();
-      //      menuPrincipal.setVisible(true);
-            
-            // Cerrar esta ventana de Login
-            this.dispose(); 
-            
-        } else {
-            JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error de Login", JOptionPane.ERROR_MESSAGE);
-        }
-    }                                                
-
-    private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {                                             
-        // Aquí llamarías a tu JDialog de Registro
-        // Ejemplo:
-        // RegistroView dialog = new RegistroView(this, true);
-        // dialog.setVisible(true);
+     
+        Connection conn = Conexion.getConexion(); 
         
-        JOptionPane.showMessageDialog(this, "Aquí se abriría la ventana de registro.");
-    }                                            
+        if (conn == null) {
+            JOptionPane.showMessageDialog(this, "No se pudo establecer conexión con la base de datos.", "Error Crítico", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
+
+        String sql = "SELECT * FROM usuarios WHERE usuario = ? AND clave = ?";
+
+    
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+         
+            pstmt.setString(1, usuario);
+            pstmt.setString(2, pass);
+
+     
+            try (ResultSet rs = pstmt.executeQuery()) {
+                
+               
+                if (rs.next()) {
+              
+                    MainView menuPrincipal = new MainView(this); 
+                    menuPrincipal.setVisible(true);
+
+         
+                    this.setVisible(false); 
+                    
+                } else {
+                
+                    JOptionPane.showMessageDialog(this, "Usuario o contraseña incorrectos", "Error de Login", JOptionPane.ERROR_MESSAGE);
                 }
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(LoginView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(LoginView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(LoginView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            
+        } catch (SQLException e) {
+
+            JOptionPane.showMessageDialog(this, 
+                "Error al consultar la base de datos: " + e.getMessage(),
+                "Error de Base de Datos", 
+                JOptionPane.ERROR_MESSAGE);
+        }
+        
+
+    }                                          
+
+   private void btnRegistrarActionPerformed(java.awt.event.ActionEvent evt) {                                             
+
+        RegistroView dialog = new RegistroView(this, true);
+        
+
+        dialog.setVisible(true);
+        
+
+        txtUsuario.requestFocus();
+    }                                         
+
+    
+
+    public static void main(String args[]) {
+        
+
+        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
+        try {
+            
+            // --- ¡¡¡ ESTA ES LA LÍNEA MÁGICA !!! ---
+            javax.swing.UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatLightLaf());
+            
         } catch (javax.swing.UnsupportedLookAndFeelException ex) {
             java.util.logging.Logger.getLogger(LoginView.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         //</editor-fold>
 
-        /* Create and display the form */
+     
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
                 new LoginView().setVisible(true);
@@ -311,20 +293,21 @@ public class LoginView extends javax.swing.JFrame {
         });
     }
 
-    // Variables declaration - do not modify                     
+                    
     private javax.swing.JButton btnIniciarSesion;
     private javax.swing.JButton btnRegistrar;
-    // 'lblLogo' se declara arriba
     private javax.swing.JLabel lblPassword;
     private javax.swing.JLabel lblTitulo;
     private javax.swing.JLabel lblUsuario;
     private javax.swing.JPanel panelLogin;
     private javax.swing.JPasswordField txtPassword;
     private javax.swing.JTextField txtUsuario;
-    // End of variables declaration                   
+                 
 }
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
+
+        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -336,8 +319,11 @@ public class LoginView extends javax.swing.JFrame {
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGap(0, 300, Short.MAX_VALUE)
         );
+
+        pack();
     }// </editor-fold>//GEN-END:initComponents
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables
+
